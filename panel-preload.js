@@ -1,18 +1,27 @@
-// panel-preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
+let panelData = null;
+
 ipcRenderer.on('initialize', (event, data) => {
-  const { url, wallet } = data;
-
-  // Expose wallet to the webview content
-  contextBridge.exposeInMainWorld('walletAPI', {
-    getWallet: () => wallet,
-  });
-
-  // Load the URL
-  ipcRenderer.send('load-url', url);
+    console.log('Received initialize event with data:', data);
+    panelData = data;
+    if (data.url) {
+        console.log('Sending load-url event with URL:', data.url);
+        ipcRenderer.send('load-url', data.url);
+    } else {
+        console.error('No URL provided in initialize event');
+    }
 });
 
-ipcRenderer.on('load-url', (event, url) => {
-  // This can be used if you need to handle URL loading in the preload
+contextBridge.exposeInMainWorld('panelAPI', {
+    getPublicKey: () => panelData ? panelData.publicKey : null,
+    getUrl: () => panelData ? panelData.url : null,
+    getSignature: () => panelData ? panelData.signature : null,
+    onReady: (callback) => {
+        if (panelData) {
+            callback();
+        } else {
+            ipcRenderer.once('initialize', () => callback());
+        }
+    },
 });

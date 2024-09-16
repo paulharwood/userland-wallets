@@ -1,156 +1,129 @@
-const {
-  app,
-  BrowserWindow,
-  ipcMain
-} = require("electron");
-const path = require("path");
+const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
+const path = require('path');
 const fs = require("fs");
 const nacl = require('tweetnacl');
 const util = require('tweetnacl-util');
 
 let userlandWindow;
-let panels = [];
 let keyPair;
+let panelView;
 
 /**
- * Creates the userland window.
+ * Creates the main userland window of the application.
+ * @function
+ * @name createUserlandWindow
  */
 function createUserlandWindow() {
   userlandWindow = new BrowserWindow({
-    webSecurity: true,
-    width: 1024,
-    height: 768,
+    width: 800,
+    height: 600,
     webPreferences: {
       preload: path.join(__dirname, 'userland-preload.js'),
-      nodeIntegration: false,
       contextIsolation: true,
-      additionalArguments: ["--disable-features=IsolateOrigins,site-per-process"],
+      nodeIntegration: false,
     },
   });
 
-  userlandWindow.loadFile('index.html');
-
-  userlandWindow.webContents.openDevTools();
-
-  userlandWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-       ...details.responseHeaders,
-        "Content-Security-Policy": ["default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'self'"]
-      }
-    })
-  })
+  userlandWindow.loadFile('userland.html');
+  userlandWindow.webContents.openDevTools(); // For debugging
 }
 
-/**
- * Event handler for when the application is ready.
- * Generates a new key pair and creates the userland window.
- */
 app.whenReady().then(() => {
   keyPair = nacl.sign.keyPair();
-  console.log('Public Key:', util.encodeBase64(keyPair.publicKey));
-
   createUserlandWindow();
 });
 
-/**
- * Event handler for when all windows are closed.
- * Quits the application if it's not running on macOS.
- */
-app.on('window-all-closed', () => {
-  if (process.platform!== 'darwin') app.quit();
+ipcMain.handle('get-public-key', () => {
+  return util.encodeBase64(keyPair.publicKey);
 });
 
-/**
- * Event handler for the 'open-panel' message.
- * Verifies the signature and creates a new panel window if valid.
- *
- * @param {Object} event - The event object.
- * @param {Object} data - The message data containing URL, signature, and public key.
- */
+ipcMain.handle('sign-message', (event, message) => {
+  const signature = nacl.sign.detached(util.decodeUTF8(message), keyPair.secretKey);
+  return util.encodeBase64(signature);
+});
+
 ipcMain.on('open-panel', (event, data) => {
   const { url, signature, publicKey } = data;
-
-  const messageUint8 = util.decodeUTF8(url);
-  const signatureUint8 = util.decodeBase64(signature);
-  const publicKeyUint8 = util.decodeBase64(publicKey);
-
-  const isValid = nacl.sign.detached.verify(messageUint8, signatureUint8, publicKeyUint8);
-
+  
+  // Verify the signature
+  const isValid = verifySignature(url, signature, publicKey);
+  
   if (isValid) {
-    createPanelWindow(url, publicKey);
+    createPanelWindow(url, signature, publicKey);
   } else {
-    console.error('Invalid signature. Panel not created.');
+    event.reply('panel-open-error', 'Invalid signature or URL mismatch');
   }
 });
 
 /**
- * Handles the 'get-public-key' message.
- * Returns the public key as a base64-encoded string.
- *
- * @param {Object} event - The event object.
- * @returns {string} The public key as a base64-encoded string.
+ * Verifies the signature of a message using the provided public key.
+ * @param {string} message - The original message (URL in this case).
+ * @param {string} signature - The base64-encoded signature.
+ * @param {string} publicKey - The base64-encoded public key.
+ * @returns {boolean} - True if the signature is valid, false otherwise.
  */
-ipcMain.handle('get-public-key', async (event) => {
-  return util.encodeBase64(keyPair.publicKey);
-});
+function verifySignature(message, signature, publicKey) {
+  try {
+    const messageUint8 = util.decodeUTF8(message);
+    const signatureUint8 = util.decodeBase64(signature);
+    const publicKeyUint8 = util.decodeBase64(publicKey);
+    
+    return nacl.sign.detached.verify(messageUint8, signatureUint8, publicKeyUint8);
+  } catch (error) {
+    console.error('Error verifying signature:', error);
+    return false;
+  }
+}
 
 /**
- * Handles the 'sign-message' message.
- * Signs the message with the secret key and returns the signature.
- *
- * @param {Object} event - The event object.
- * @param {string} message - The message to be signed.
- * @returns {string} The signature as a base64-encoded string.
+ * Creates a new panel window with a BrowserView to display a URL.
+ * @function
+ * @name createPanelWindow
+ * @param {string} url - The URL to load in the BrowserView.
+ * @param {string} signature - The signature for the URL.
+ * @param {string} publicKey - The public key associated with the panel.
  */
-ipcMain.handle('sign-message', async (event, message) => {
-  const messageUint8 = util.decodeUTF8(message);
-  const signatureUint8 = nacl.sign.detached(messageUint8, keyPair.secretKey);
-  return util.encodeBase64(signatureUint8);
-});
-
-/**
- * Creates a new panel window with the specified URL and public key.
- *
- * @param {string} url - The URL for the panel window.
- * @param {string} userPublicKeyBase64 - The public key as a base64-encoded string.
- */
-function createPanelWindow(url, userPublicKeyBase64) {
+function createPanelWindow(url, signature, publicKey) {
   const panelWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1024,
+    height: 768,
     webPreferences: {
       preload: path.join(__dirname, 'panel-preload.js'),
-      nodeIntegration: false,
       contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: true, // Enable webview tag
+      // Keep webSecurity true for the main window
+      webSecurity: true,
     },
   });
 
   panelWindow.loadFile('panel.html');
 
   panelWindow.webContents.on('did-finish-load', () => {
-    const wallet = deriveWallet(userPublicKeyBase64, url);
-
-    panelWindow.webContents.send('initialize', {
-      url: url,
-      wallet: wallet,
-    });
+    console.log('Sending initialize event to panel with:', { url, signature, publicKey });
+    panelWindow.webContents.send('initialize', { url, signature, publicKey });
   });
 
-  panels.push(panelWindow);
+  panelWindow.webContents.openDevTools(); // For debugging
 }
 
-/**
- * Derives a wallet for the panel based on the public key and URL.
- *
- * @param {string} publicKeyBase64 - The public key as a base64-encoded string.
- * @param {string} url - The URL for the panel window.
- * @returns {string} The derived wallet.
- */
-function deriveWallet(publicKeyBase64, url) {
-  const hashInput = publicKeyBase64 + url;
-  const hashUint8 = nacl.hash(util.decodeUTF8(hashInput));
-  const wallet = util.encodeBase64(hashUint8).substring(0, 32); // Get first 32 characters
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
 
-  return wallet;
-}
+ipcMain.on('load-url', (event, url) => {
+  if (panelView) {
+    console.log('Attempting to load URL in BrowserView:', url);
+    panelView.webContents.loadURL(url)
+      .then(() => {
+        console.log('URL loaded successfully');
+      })
+      .catch((error) => {
+        console.error('Error loading URL:', error);
+      });
+  } else {
+    console.error('panelView is not initialized');
+  }
+});
+
+// ... rest of your main.js code ...

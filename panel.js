@@ -1,25 +1,21 @@
-window.addEventListener('DOMContentLoaded', () => {
-  const webview = document.getElementById('webview');
+console.log('panel.js is running');
 
-  // Load the URL using the API
-  window.electronAPI.receive('load-url', (url) => {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      // Default to http if no protocol is specified
-      url = 'http://' + url;
-    }
+document.addEventListener('DOMContentLoaded', () => {
+	const publicKeyDisplay = document.getElementById('publicKeyDisplay');
 
-    webview.src = url;
-  });
-});
+	if (window.panelAPI) {
+		window.panelAPI.onReady(() => {
+			const publicKey = window.panelAPI.getPublicKey();
+			const url = window.panelAPI.getUrl();
+			const signature = window.panelAPI.getSignature();
 
-// Expose APIs
-const { contextBridge, ipcRenderer } = require('electron');
+			console.log('Public Key:', publicKey);
+			console.log('URL:', url);
+			console.log('Signature:', signature);
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  receive: (channel, func) => {
-    ipcRenderer.on(channel, (event, ...args) => func(...args));
-  },
-  send: (channel, data) => {
-    ipcRenderer.send(channel, data);
-  },
+			publicKeyDisplay.textContent = `Public Key: ${publicKey}`;
+		});
+	} else {
+		console.error('panelAPI not available');
+	}
 });
