@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
  * @namespace
  * @name userlandAPI
  */
-contextBridge.exposeInMainWorld('electronAPI', {
+contextBridge.exposeInMainWorld('userlandAPI', {
   /**
    * Retrieves or generates a public key.
    * @function
@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @param {string} signature - The signature for the URL.
    * @param {string} publicKey - The public key associated with the panel.
    */
-  openPanel: (data) => ipcRenderer.send('open-panel', data),
+  openPanel: (url, signature, publicKey) => ipcRenderer.send('open-panel', { url, signature, publicKey }),
 
   /**
    * Handles the panel open error event.
@@ -39,5 +39,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @name onPanelOpenError
    * @param {function} callback - The callback function to handle the error.
    */
-  onPanelOpenError: (callback) => ipcRenderer.on('panel-open-error', (event, ...args) => callback(...args))
+   onPanelOpenError: (callback) => ipcRenderer.on('panel-open-error', (event, ...args) => callback(...args)) // Add this line
 });

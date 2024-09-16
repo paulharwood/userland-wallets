@@ -12,10 +12,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    if (!window.electronAPI) {
-        console.error('Electron API not found. Make sure the preload script is correctly set up.');
+    if (!window.userlandAPI) {
+        console.error('Userland API not found. Make sure the preload script is correctly set up.');
         return;
     }
+
+    // Listen for panel open errors
+    window.userlandAPI.onPanelOpenError((errorMessage) => {
+        console.error('Failed to open panel:', errorMessage);
+    });   
 
     /**
      * Event listener for the "Open Panel" button click.
@@ -30,6 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 url = 'https://' + url;
             }
             try {
+                if (!window.userlandAPI.getPublicKey || !window.userlandAPI.signMessage || !window.userlandAPI.openPanel) {
+                    throw new Error('Userland API methods are not available');
+                }
+
                 /**
                  * Retrieves the public key from the userland API.
                  * @type {string}
@@ -59,10 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.userlandAPI.openPanel(url, signature, publicKey);
             } catch (error) {
                 console.error('Error opening panel:', error);
-                alert(`Error: ${error.message}`);
+                console.error(`Error: ${error.message}`);
             }
         } else {
-            alert('Please enter a URL');
+            console.error('Please enter a URL');
         }
     });
 
@@ -73,20 +82,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('Please enter a URL');
             }
 
-            const publicKey = await window.electronAPI.getPublicKey();
-            const signature = await window.electronAPI.signMessage(url);
+            const publicKey = await window.userlandAPI.getPublicKey();
+            const signature = await window.userlandAPI.signMessage(url);
             
-            window.electronAPI.openPanel({ url, signature, publicKey });
+            window.userlandAPI.openPanel({ url, signature, publicKey });
         } catch (error) {
             console.error('Error opening panel:', error);
-            alert(`Error: ${error.message}`);
+            console.error(`Error: ${error.message}`);
         }
     }
 
     // Listen for panel open errors
-    window.electronAPI.onPanelOpenError((errorMessage) => {
+    window.userlandAPI.onPanelOpenError((errorMessage) => {
         console.error('Failed to open panel:', errorMessage);
-        alert(`Failed to open panel: ${errorMessage}`);
+        console.error(`Failed to open panel: ${errorMessage}`);
     });
 
     // Attach this function to your button click event
