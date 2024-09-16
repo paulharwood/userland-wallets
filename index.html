@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Userland</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'self'">
+
+</head>
+
+<body>
+  <h1>USERLAND</h1>
+  <button id="spawn-button">Spawn new window</button>
+  <script>
+    document.getElementById('spawn-button').addEventListener('click', async () => {
+      const publicKey = await userlandAPI.getPublicKey();
+      console.log('Public Key:', publicKey);
+
+      const message = 'Hello, World!';
+      const signature = await userlandAPI.signMessage(message);
+      console.log('Signature:', signature);
+
+      // Send the signed message to the new window
+      userlandAPI.openPanel({
+        url: 'panel.html',
+        signature,
+        publicKey,
+      });
+    });
+  </script>
+</body>
+
+</html>
