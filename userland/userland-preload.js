@@ -60,7 +60,3 @@ contextBridge.exposeInMainWorld('userlandAPI', {
    onPanelOpenError: (callback) => ipcRenderer.on('panel-open-error', (event, ...args) => callback(...args)) // Add this line
 });
 
-contextBridge.exposeInMainWorld('electronAPI', {
-    // Other API methods...
-    onDisplayError: (callback) => ipcRenderer.on('display-error', (event, message) => callback(message)),
-});
