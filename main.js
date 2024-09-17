@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, WebContentsView } = require('electron');
 const path = require('path');
 const fs = require("fs");
 const nacl = require('tweetnacl');
@@ -148,6 +148,13 @@ function createPanelWindow(url, signature, publicKey) {
     });
 
     panelWindow.webContents.openDevTools(); // For debugging
+
+    // Create a WebContentsView
+    const view = new WebContentsView();
+    view.setBounds({ x: 0, y: 0, width: 1024, height: 768 }); // Adjust as needed
+    view.webContents.loadURL(url);
+
+    panelWindow.addWebContentsView(view);
 }
 
 app.on('window-all-closed', () => {
@@ -167,6 +174,15 @@ ipcMain.on('load-url', (event, url) => {
     } else {
         console.error('panelView is not initialized');
     }
+});
+
+ipcMain.on('create-web-contents-view', (event, url) => {
+    const mainWindow = BrowserWindow.fromWebContents(event.sender);
+    const view = new WebContentsView();
+    view.setBounds({ x: 0, y: 0, width: 800, height: 600 }); // Adjust dimensions as needed
+    view.webContents.loadURL(url);
+
+    mainWindow.addWebContentsView(view);
 });
 
 // ... rest of your main.js code ...

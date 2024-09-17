@@ -42,6 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
             publicKeyDisplay.textContent = `Public Key: ${publicKey}`;
             urlDisplay.textContent = `URL: ${url}`;
             signatureDisplay.textContent = `Signature: ${signature}`;
+
+            
         });
     } else {
         console.error('panelAPI not available');
