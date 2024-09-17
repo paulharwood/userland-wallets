@@ -6,6 +6,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const urlInput = document.getElementById('urlInput');
     const openPanelButton = document.getElementById('openPanel');
+    const errorDisplay = document.getElementById('errorDisplay'); // Ensure you have an element for displaying errors
 
     if (!urlInput || !openPanelButton) {
         console.error('Required DOM elements not found');
@@ -96,6 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.userlandAPI.onPanelOpenError((errorMessage) => {
         console.error('Failed to open panel:', errorMessage);
         console.error(`Failed to open panel: ${errorMessage}`);
+    });
+
+    // Listen for error messages from the preload script
+    window.electronAPI.onDisplayError((errorMessage) => {
+        if (errorDisplay) {
+            errorDisplay.textContent = errorMessage; // Display the error message
+            errorDisplay.style.display = 'block'; // Make sure the error display is visible
+        }
     });
 
     // Attach this function to your button click event

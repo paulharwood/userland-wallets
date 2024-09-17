@@ -8,28 +8,7 @@ let userlandWindow;
 let keyPair;
 let panelView;
 
-
-/**
- * Sets up secure restorable state for macOS.
- * This code block is only executed on macOS (Darwin) systems.
- * It ensures that the app supports secure restorable state,
- * which is important for preserving app state across restarts on macOS.
- */
-// this is mentioned in a bug that requires tracking: https://github.com/electron/electron/pull/40296 & https://github.com/electron/electron/issues/40318
-// if (process.platform === 'darwin') {
-//   app.on('will-finish-launching', () => {
-//     app.on('ready', () => {
-//       if (typeof app.setSupportsSecureRestorableState === 'function') {
-//         app.setSupportsSecureRestorableState(true);
-//       } else {
-//         console.warn('setSupportsSecureRestorableState is not available in this Electron version');
-//       }
-//     });
-//   });
-// }
-// TEMPORARY FIX: https://github.com/electron/electron/issues/40318
-app.dock.hide()
-
+app.dock.hide();
 
 /**
  * Creates the main userland window of the application.
@@ -37,18 +16,18 @@ app.dock.hide()
  * @name createUserlandWindow
  */
 function createUserlandWindow() {
-  userlandWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, 'userland-preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+    userlandWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+            preload: path.join(__dirname, 'userland-preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
 
-  userlandWindow.loadFile('userland.html');
-  userlandWindow.webContents.openDevTools(); // For debugging
+    userlandWindow.loadFile('userland.html');
+    userlandWindow.webContents.openDevTools(); // For debugging
 }
 
 /**
@@ -57,8 +36,8 @@ function createUserlandWindow() {
  * @listens app#whenReady
  */
 app.whenReady().then(() => {
-  keyPair = nacl.sign.keyPair();
-  createUserlandWindow();
+    keyPair = nacl.sign.keyPair();
+    createUserlandWindow();
 });
 
 /**
@@ -69,7 +48,7 @@ app.whenReady().then(() => {
  * @returns {string} The base64-encoded public key.
  */
 ipcMain.handle('get-public-key', () => {
-  return util.encodeBase64(keyPair.publicKey);
+    return util.encodeBase64(keyPair.publicKey);
 });
 
 /**
@@ -82,8 +61,11 @@ ipcMain.handle('get-public-key', () => {
  * @returns {string} The base64-encoded signature.
  */
 ipcMain.handle('sign-message', (event, message) => {
-  const signature = nacl.sign.detached(util.decodeUTF8(message), keyPair.secretKey);
-  return util.encodeBase64(signature);
+    if (typeof message !== 'string') {
+        throw new Error('Message must be a string');
+    }
+    const signature = nacl.sign.detached(util.decodeUTF8(message), keyPair.secretKey);
+    return util.encodeBase64(signature);
 });
 
 /**
@@ -98,14 +80,23 @@ ipcMain.handle('sign-message', (event, message) => {
  * @param {string} args.publicKey - The base64-encoded public key.
  */
 ipcMain.on('open-panel', (event, { url, signature, publicKey }) => {
-  // Verify the signature
-  const isValid = verifySignature(url, signature, publicKey);
-  
-  if (isValid) {
-    createPanelWindow(url, signature, publicKey);
-  } else {
-    event.reply('panel-open-error', 'Invalid signature or URL mismatch');
-  }
+    console.log('Received open-panel request with:', { url, signature, publicKey }); // Log the values
+
+    // Validate input types
+    if (typeof url !== 'string' || typeof signature !== 'string' || typeof publicKey !== 'string') {
+        console.error('Invalid input types:', { url, signature, publicKey });
+        event.reply('panel-open-error', 'Invalid input types');
+        return;
+    }
+
+    // Verify the signature
+    const isValid = verifySignature(url, signature, publicKey);
+    
+    if (isValid) {
+        createPanelWindow(url, signature, publicKey);
+    } else {
+        event.reply('panel-open-error', 'Invalid signature or URL mismatch');
+    }
 });
 
 /**
@@ -116,16 +107,16 @@ ipcMain.on('open-panel', (event, { url, signature, publicKey }) => {
  * @returns {boolean} - True if the signature is valid, false otherwise.
  */
 function verifySignature(message, signature, publicKey) {
-  try {
-    const messageUint8 = util.decodeUTF8(message);
-    const signatureUint8 = util.decodeBase64(signature);
-    const publicKeyUint8 = util.decodeBase64(publicKey);
-    
-    return nacl.sign.detached.verify(messageUint8, signatureUint8, publicKeyUint8);
-  } catch (error) {
-    console.error('Error verifying signature:', error);
-    return false;
-  }
+    try {
+        const messageUint8 = util.decodeUTF8(message);
+        const signatureUint8 = util.decodeBase64(signature);
+        const publicKeyUint8 = util.decodeBase64(publicKey);
+        
+        return nacl.sign.detached.verify(messageUint8, signatureUint8, publicKeyUint8);
+    } catch (error) {
+        console.error('Error verifying signature:', error);
+        return false;
+    }
 }
 
 /**
@@ -137,46 +128,45 @@ function verifySignature(message, signature, publicKey) {
  * @param {string} publicKey - The public key associated with the panel.
  */
 function createPanelWindow(url, signature, publicKey) {
-  const panelWindow = new BrowserWindow({
-    width: 1024,
-    height: 768,
-    webPreferences: {
-      preload: path.join(__dirname, 'panel-preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      webviewTag: true, // Enable webview tag
-      // Keep webSecurity true for the main window
-      webSecurity: true,
-    },
-  });
+    const panelWindow = new BrowserWindow({
+        width: 1024,
+        height: 768,
+        webPreferences: {
+            preload: path.join(__dirname, 'panel-preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            webviewTag: true, // Enable webview tag
+            webSecurity: true, // Keep webSecurity true for the main window
+        },
+    });
 
-  panelWindow.loadFile('panel.html');
+    panelWindow.loadFile('panel.html');
 
-  panelWindow.webContents.on('did-finish-load', () => {
-    console.log('Sending initialize event to panel with:', { url, signature, publicKey });
-    panelWindow.webContents.send('initialize', { url, signature, publicKey });
-  });
+    panelWindow.webContents.on('did-finish-load', () => {
+        console.log('Sending initialize event to panel with:', { url, signature, publicKey });
+        panelWindow.webContents.send('initialize', { url, signature, publicKey });
+    });
 
-  panelWindow.webContents.openDevTools(); // For debugging
+    panelWindow.webContents.openDevTools(); // For debugging
 }
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+    if (process.platform !== 'darwin') app.quit();
 });
 
 ipcMain.on('load-url', (event, url) => {
-  if (panelView) {
-    console.log('Attempting to load URL in BrowserView:', url);
-    panelView.webContents.loadURL(url)
-      .then(() => {
-        console.log('URL loaded successfully');
-      })
-      .catch((error) => {
-        console.error('Error loading URL:', error);
-      });
-  } else {
-    console.error('panelView is not initialized');
-  }
+    if (panelView) {
+        console.log('Attempting to load URL in BrowserView:', url);
+        panelView.webContents.loadURL(url)
+            .then(() => {
+                console.log('URL loaded successfully');
+            })
+            .catch((error) => {
+                console.error('Error loading URL:', error);
+            });
+    } else {
+        console.error('panelView is not initialized');
+    }
 });
 
 // ... rest of your main.js code ...

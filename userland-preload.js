@@ -12,7 +12,15 @@ contextBridge.exposeInMainWorld('userlandAPI', {
    * @name getPublicKey
    * @returns {Promise<string>} A promise that resolves with the public key.
    */
-  getPublicKey: () => ipcRenderer.invoke('get-public-key'),
+  getPublicKey: async () => {
+    try {
+      return await ipcRenderer.invoke('get-public-key');
+    } catch (error) {
+      console.error('Error retrieving public key:', error.message);
+      ipcRenderer.send('display-error', 'Failed to retrieve public key. Please try again later.');
+      throw new Error('Failed to retrieve public key. Please try again later.');
+    }
+  },
 
   /**
    * Signs a message with the private key.
@@ -21,7 +29,15 @@ contextBridge.exposeInMainWorld('userlandAPI', {
    * @param {string} message - The message to sign.
    * @returns {Promise<string>} A promise that resolves with the signature.
    */
-  signMessage: (message) => ipcRenderer.invoke('sign-message', message),
+  signMessage: async (message) => {
+    try {
+      return await ipcRenderer.invoke('sign-message', message);
+    } catch (error) {
+      console.error('Error signing message:', error.message);
+      ipcRenderer.send('display-error', 'Failed to sign message. Please try again later.');
+      throw new Error('Failed to sign message. Please try again later.');
+    }
+  },
 
   /**
    * Opens a new panel window with the specified URL, signature, and public key.
@@ -31,7 +47,9 @@ contextBridge.exposeInMainWorld('userlandAPI', {
    * @param {string} signature - The signature for the URL.
    * @param {string} publicKey - The public key associated with the panel.
    */
-  openPanel: (url, signature, publicKey) => ipcRenderer.send('open-panel', { url, signature, publicKey }),
+  openPanel: (url, signature, publicKey) => {
+    ipcRenderer.send('open-panel', { url, signature, publicKey });
+  },
 
   /**
    * Handles the panel open error event.
@@ -40,4 +58,9 @@ contextBridge.exposeInMainWorld('userlandAPI', {
    * @param {function} callback - The callback function to handle the error.
    */
    onPanelOpenError: (callback) => ipcRenderer.on('panel-open-error', (event, ...args) => callback(...args)) // Add this line
+});
+
+contextBridge.exposeInMainWorld('electronAPI', {
+    // Other API methods...
+    onDisplayError: (callback) => ipcRenderer.on('display-error', (event, message) => callback(message)),
 });
