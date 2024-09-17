@@ -7,6 +7,8 @@ console.log('panel.js is running');
  */
 document.addEventListener('DOMContentLoaded', () => {
     const publicKeyDisplay = document.getElementById('publicKeyDisplay');
+    const urlDisplay = document.getElementById('urlDisplay');
+    const signatureDisplay = document.getElementById('signatureDisplay');
 
     if (window.panelAPI) {
         /**
@@ -38,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Signature:', signature);
 
             publicKeyDisplay.textContent = `Public Key: ${publicKey}`;
+            urlDisplay.textContent = `URL: ${url}`;
+            signatureDisplay.textContent = `Signature: ${signature}`;
         });
     } else {
         console.error('panelAPI not available');
